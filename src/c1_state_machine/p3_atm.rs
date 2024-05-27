@@ -58,7 +58,66 @@ impl StateMachine for Atm {
     type Transition = Action;
 
     fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-        todo!("Exercise 4")
+        let mut new_state = starting_state.clone();
+        match t {
+            Action::SwipeCard(pin_hash) => match starting_state.expected_pin_hash {
+                Auth::Waiting => {
+                    new_state.expected_pin_hash = Auth::Authenticating(*pin_hash);
+                    new_state
+                }
+                Auth::Authenticating(_) => new_state,
+                Auth::Authenticated => {
+                    new_state.expected_pin_hash = Auth::Authenticating(*pin_hash);
+                    new_state
+                }
+            },
+            Action::PressKey(key) => match starting_state.expected_pin_hash {
+                Auth::Waiting => new_state,
+                Auth::Authenticating(pin_hash) => match key {
+                    Key::Enter => {
+                        let computed_pin_hash = crate::hash(&new_state.keystroke_register);
+                        if pin_hash == computed_pin_hash {
+                            new_state.expected_pin_hash = Auth::Authenticated;
+                            new_state.keystroke_register = Vec::new();
+                            new_state
+                        } else {
+                            new_state.expected_pin_hash = Auth::Waiting;
+                            new_state.keystroke_register = Vec::new();
+                            new_state
+                        }
+                    }
+                    _ => {
+                        new_state.keystroke_register.push(key.clone());
+                        new_state
+                    }
+                },
+                Auth::Authenticated => match key {
+                    Key::Enter => {
+                        let mut amount_string = String::new();
+                        for key in new_state.keystroke_register {
+                            match key {
+                                Key::One => amount_string.push_str("1"),
+                                Key::Two => amount_string.push_str("2"),
+                                Key::Three => amount_string.push_str("3"),
+                                Key::Four => amount_string.push_str("4"),
+                                _ => {}
+                            }
+                        }
+                        let amount: u64 = amount_string.as_str().parse().unwrap();
+                        new_state.expected_pin_hash = Auth::Waiting;
+                        new_state.keystroke_register = Vec::new();
+                        if amount < new_state.cash_inside {
+                            new_state.cash_inside -= amount;
+                        }
+                        new_state
+                    }
+                    _ => {
+                        new_state.keystroke_register.push(key.clone());
+                        new_state
+                    }
+                },
+            },
+        }
     }
 }
 
