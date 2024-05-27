@@ -76,15 +76,13 @@ impl StateMachine for Atm {
                 Auth::Authenticating(pin_hash) => match key {
                     Key::Enter => {
                         let computed_pin_hash = crate::hash(&new_state.keystroke_register);
+                        new_state.keystroke_register = Vec::new();
                         if pin_hash == computed_pin_hash {
                             new_state.expected_pin_hash = Auth::Authenticated;
-                            new_state.keystroke_register = Vec::new();
-                            new_state
                         } else {
                             new_state.expected_pin_hash = Auth::Waiting;
-                            new_state.keystroke_register = Vec::new();
-                            new_state
                         }
+                        new_state
                     }
                     _ => {
                         new_state.keystroke_register.push(key.clone());
