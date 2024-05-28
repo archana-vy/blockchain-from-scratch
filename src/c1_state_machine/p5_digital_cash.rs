@@ -54,6 +54,10 @@ impl State {
         self.bills.insert(elem);
         self.increment_serial()
     }
+
+    fn remove_bill(&mut self, elem: Bill) -> bool {
+        self.bills.remove(&elem)
+    }
 }
 
 impl FromIterator<Bill> for State {
@@ -94,7 +98,62 @@ impl StateMachine for DigitalCashSystem {
     type Transition = CashTransaction;
 
     fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-        todo!("Exercise 1")
+        let mut next_state = starting_state.clone();
+        match t {
+            CashTransaction::Mint { minter, amount } => {
+                let bill = Bill {
+                    owner: *minter,
+                    amount: *amount,
+                    serial: starting_state.next_serial,
+                };
+                next_state.add_bill(bill);
+                next_state
+            }
+            CashTransaction::Transfer { spends, receives } => {
+                let total_spends: u128 = spends.iter().map(|s| s.amount as u128).sum();
+                let total_receives: u128 = receives.iter().map(|r| r.amount as u128).sum();
+
+                if total_receives > total_spends {
+                    return next_state;
+                }
+
+                let mut serial_set: HashSet<u64> = next_state.bills.iter().map(|bill| bill.serial).collect();
+                let max_serial = next_state.next_serial() + receives.len() as u64;
+                for r in receives {
+                    if !serial_set.insert(r.serial) || r.serial >= max_serial {
+                        // invalid serial serial already exists
+                        return next_state;
+                    }
+
+                    if r.amount == 0 {
+                        // invalid received amount 
+                        return next_state;
+                    }
+                }
+
+                let mut serial_set = HashSet::new();
+
+                for s in spends {
+                    if !next_state.bills.contains(s) {
+                        return next_state;
+                    }
+
+                    if !serial_set.insert(s.serial) {
+                        return next_state;
+                    }
+                }
+
+                for s in spends {
+                    next_state.bills.remove(s);
+                }
+
+                for r in receives {
+                    next_state.add_bill(r.clone());
+                }
+
+                next_state
+            }
+        }
     }
 }
 
