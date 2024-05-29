@@ -117,16 +117,16 @@ impl StateMachine for DigitalCashSystem {
                     return next_state;
                 }
 
-                let mut serial_set: HashSet<u64> = next_state.bills.iter().map(|bill| bill.serial).collect();
-                let max_serial = next_state.next_serial() + receives.len() as u64;
+                let mut serial_set: HashSet<u64> =
+                    next_state.bills.iter().map(|bill| bill.serial).collect();
                 for r in receives {
-                    if !serial_set.insert(r.serial) || r.serial >= max_serial {
+                    if !serial_set.insert(r.serial) {
                         // invalid serial serial already exists
                         return next_state;
                     }
 
                     if r.amount == 0 {
-                        // invalid received amount 
+                        // invalid received amount
                         return next_state;
                     }
                 }
@@ -148,6 +148,9 @@ impl StateMachine for DigitalCashSystem {
                 }
 
                 for r in receives {
+                    if r.serial != next_state.next_serial() {
+                        return starting_state.clone();
+                    }
                     next_state.add_bill(r.clone());
                 }
 
